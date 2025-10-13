@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Box, Typography, useMediaQuery } from "@mui/material";
+import { Box, useMediaQuery } from "@mui/material";
 import { teamsService } from "@/services/APIs/teamsService";
 import { Team } from "@/types/team";
 import CreateTeamForm from "./teamForm";
 import TeamsGrid from "./teamsGrid";
 import theme from "@/theme/theme";
 
-export default function TeamsPage() {
+const TeamsDashboard: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const isDesktop = useMediaQuery("(min-width:1024px)");
 
@@ -25,32 +25,25 @@ export default function TeamsPage() {
         mx: "auto",
       }}
     >
-      <Typography
-        variant="h3"
-        sx={{
-          fontWeight: 600,
-          mb: theme.spacing(6),
-          textAlign: "center",
-        }}
-      >
-        Teams Management
-      </Typography>
-
       <Box
         sx={{
           display: "flex",
-          gap: theme.spacing(6),
           flexDirection: isDesktop ? "row" : "column",
+          gap: theme.spacing(6),
         }}
       >
-        <Box sx={{ flex: 1 }}>
+        {/* Left column: Form */}
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
           <CreateTeamForm />
         </Box>
 
+        {/* Right column: Grid */}
         <Box sx={{ flex: 2 }}>
           <TeamsGrid teams={teams} />
         </Box>
       </Box>
     </Box>
   );
-}
+};
+
+export default TeamsDashboard;
