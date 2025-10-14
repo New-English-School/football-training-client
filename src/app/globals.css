@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ----------------------------- */
 /* 🌍 GLOBAL RESET + BASE STYLES */
 /* ----------------------------- */
@@ -130,4 +134,25 @@ a:hover {
 }
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgba(108, 99, 255, 0.6);
+}
+
+/* Dark Mode Styles */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #121212;
+    --color-surface: #1e1e1e;
+    --color-text: #ffffff;
+    --color-muted: #b0b0b0;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  .logo {
+    filter: invert(1);
+    transition: filter 0.3s ease;
+  }
 }
