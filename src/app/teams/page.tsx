@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Box, useMediaQuery, Modal } from "@mui/material";
+import {
+  Box,
+  useMediaQuery,
+  Modal,
+  CircularProgress,
+  Typography,
+} from "@mui/material";
 import theme from "@/theme/theme";
 import { teamsService } from "@/services/APIs/teamsService";
 import { Team } from "@/types/team";
@@ -12,6 +18,7 @@ const TeamsPage: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const isDesktop = useMediaQuery("(min-width:1024px)", {
     noSsr: true,
@@ -19,7 +26,30 @@ const TeamsPage: React.FC = () => {
   });
 
   useEffect(() => {
-    teamsService.findAll().then(setTeams).catch(console.error);
+    let minLoadingTimeout: NodeJS.Timeout;
+
+    const fetchTeams = async () => {
+      setLoading(true);
+
+      // Minimum 3 seconds spinner
+      minLoadingTimeout = setTimeout(() => {
+        setLoading(false);
+      }, 3000);
+
+      try {
+        const data = await teamsService.findAll();
+        setTeams(data);
+        setLoading(false); // stop spinner if data arrives early
+      } catch (error) {
+        console.error("❌ Failed to fetch teams:", error);
+        setTeams([]);
+        setLoading(false);
+      }
+    };
+
+    fetchTeams();
+
+    return () => clearTimeout(minLoadingTimeout);
   }, []);
 
   const handleAddTeam = (newTeam: Team) =>
@@ -57,6 +87,9 @@ const TeamsPage: React.FC = () => {
         maxWidth: 1400,
         mx: "auto",
         width: "100%",
+        minHeight: "80vh", // ensures enough height for centering
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <Box
@@ -65,11 +98,10 @@ const TeamsPage: React.FC = () => {
           flexDirection: isDesktop ? "row" : "column",
           alignItems: "stretch",
           gap: theme.spacing(6),
-          height: "100%", // ensure container fills vertical space
-          minHeight: { md: 800 }, // keep consistent minimum height
+          flexGrow: 1, // fills vertical space
         }}
       >
-        {/* Left column: create team form */}
+        {/* Left column: create/edit team form */}
         <Box
           sx={{
             flex: 1,
@@ -81,24 +113,58 @@ const TeamsPage: React.FC = () => {
           <TeamsForm onSuccess={handleAddTeam} />
         </Box>
 
-        {/* Right column: teams grid */}
+        {/* Right column: TeamsGrid or loading/empty state */}
         <Box
           sx={{
             flex: 2,
             mt: isDesktop ? 0 : 4,
             display: "flex",
             flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "stretch",
           }}
         >
-          <TeamsGrid
-            teams={teams}
-            onViewEdit={handleViewEdit}
-            onDelete={handleDeleteTeam}
-          />
+          {loading ? (
+            <Box
+              sx={{
+                flexGrow: 1,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
+              <CircularProgress size={60} />
+            </Box>
+          ) : teams.length === 0 ? (
+            <Box
+              sx={{
+                flexGrow: 1,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
+              <Typography
+                variant="h6"
+                color="text.secondary"
+                textAlign="center"
+              >
+                No teams found.
+              </Typography>
+            </Box>
+          ) : (
+            <TeamsGrid
+              teams={teams}
+              onViewEdit={handleViewEdit}
+              onDelete={handleDeleteTeam}
+            />
+          )}
         </Box>
       </Box>
 
-      {/* Modal for editing */}
+      {/* Modal for editing team */}
       <Modal open={modalOpen} onClose={handleCloseModal}>
         <Box
           sx={{

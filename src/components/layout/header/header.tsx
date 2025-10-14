@@ -58,7 +58,12 @@ export default function Header() {
         <Container maxWidth="lg">
           <Toolbar sx={headerStyles.toolbar}>
             {/* Logo */}
-            <Typography variant="h6" component="div">
+            <Typography
+              variant="h6"
+              component={NextLink}
+              href="/"
+              sx={{ color: "inherit", textDecoration: "none", flexGrow: 1 }}
+            >
               Football Manager
             </Typography>
 
