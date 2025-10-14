@@ -1,6 +1,11 @@
 import Footer from "@/components/layout/footer/footer";
-import { AppProviders } from "./providers";
 import Header from "@/components/layout/header/header";
+import { AppProviders } from "./providers";
+
+export const metadata = {
+  title: "Football Training System",
+  description: "Manage teams, schedules, and players efficiently",
+};
 
 export default function RootLayout({
   children,
@@ -8,26 +13,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          minHeight: "100vh",
-        }}
-      >
+    <html lang="en" className="h-full">
+      <body className="flex flex-col min-h-screen">
         <AppProviders>
           <Header />
-          <main
-            style={{
-              flexGrow: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              width: "100%",
-            }}
-          >
-            {children}
+          <main className="flex-grow flex flex-col items-center w-full">
+            <div className="w-full max-w-7xl px-4">{children}</div>
           </main>
           <Footer />
         </AppProviders>
