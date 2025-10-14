@@ -2,7 +2,7 @@ export interface Team {
   id: number;
   name: string;
   coachId?: number;
-  players?: number[];
+  students?: number[];
   createdAt?: string;
   updatedAt?: string;
 }
