@@ -21,29 +21,57 @@ interface Student {
   name: string;
 }
 
-const CreateTeamForm: React.FC = () => {
-  const [formData, setFormData] = useState<CreateTeamDto>({
-    name: "",
-    coachId: undefined,
-    studentIds: [],
-  });
+interface TeamsFormProps {
+  onSubmit?: (team: Team) => void;
+  onSuccess?: (team: Team) => void;
+  initialTeam?: Team;
+}
 
+const TeamsForm: React.FC<TeamsFormProps> = ({
+  onSubmit,
+  onSuccess,
+  initialTeam,
+}) => {
   const [availableStudents, setAvailableStudents] = useState<Student[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<Student[]>([]);
-
+  const [formData, setFormData] = useState<CreateTeamDto>({
+    name: initialTeam?.name ?? "",
+    coachId: initialTeam?.coachId,
+    studentIds: [],
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Fetch available students on mount
+  const normalizeStudents = (students?: number[] | Student[]): Student[] => {
+    if (!students) return [];
+    return students.map((s) =>
+      typeof s === "number" ? { id: s, name: "" } : s
+    );
+  };
+
   useEffect(() => {
-    studentsService.findAll().then(setAvailableStudents).catch(console.error);
-  }, []);
+    studentsService
+      .findAll()
+      .then((students) => {
+        setAvailableStudents(students);
+
+        const initialSelected = normalizeStudents(initialTeam?.students);
+        if (initialSelected.length > 0) {
+          const matched = students.filter((s) =>
+            initialSelected.some((st) => st.id === s.id)
+          );
+          setSelectedStudents(matched);
+          setFormData((prev) => ({
+            ...prev,
+            studentIds: matched.map((s) => s.id),
+          }));
+        }
+      })
+      .catch(console.error);
+  }, [initialTeam]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,22 +80,31 @@ const CreateTeamForm: React.FC = () => {
     setMessage("");
 
     try {
-      // Map selected students to their IDs
       const payload: CreateTeamDto = {
         name: formData.name,
         coachId: formData.coachId,
         studentIds: selectedStudents.map((student) => student.id),
       };
 
-      // Create the team with students included
-      const createdTeam: Team = await teamsService.create(payload);
+      let savedTeam: Team;
+      if (initialTeam) {
+        savedTeam = await teamsService.update(initialTeam.id, payload);
+        setMessage(`✅ Team "${savedTeam.name}" updated successfully!`);
+      } else {
+        savedTeam = await teamsService.create(payload);
+        setMessage(`✅ Team "${savedTeam.name}" created successfully!`);
+      }
 
-      setMessage(`✅ Team "${createdTeam.name}" created successfully!`);
-      setFormData({ name: "", coachId: undefined, studentIds: [] });
-      setSelectedStudents([]);
+      onSubmit?.(savedTeam);
+      onSuccess?.(savedTeam);
+
+      if (!initialTeam) {
+        setFormData({ name: "", coachId: undefined, studentIds: [] });
+        setSelectedStudents([]);
+      }
     } catch (error) {
-      console.error("Error creating team:", error);
-      setMessage("❌ Failed to create team.");
+      console.error("Error saving team:", error);
+      setMessage("❌ Failed to save team.");
     } finally {
       setIsSubmitting(false);
     }
@@ -78,7 +115,6 @@ const CreateTeamForm: React.FC = () => {
       sx={{
         width: "100%",
         flex: 1,
-        minHeight: 650, // taller card for dashboard layout
         borderRadius: theme.spacing(2),
         bgcolor: theme.palette.background.paper,
         boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
@@ -99,7 +135,7 @@ const CreateTeamForm: React.FC = () => {
             mb: theme.spacing(3),
           }}
         >
-          Create New Team
+          {initialTeam ? "Edit Team" : "Create New Team"}
         </Typography>
 
         <Box
@@ -109,47 +145,43 @@ const CreateTeamForm: React.FC = () => {
           flexDirection="column"
           gap={theme.spacing(3)}
         >
-          {/* Team Name */}
           <TextField
             fullWidth
             label="Team Name"
             name="name"
             value={formData.name}
             onChange={handleChange}
-            variant="outlined"
-            size="medium"
             required
             color="primary"
             sx={{
-              "& .MuiOutlinedInput-root": {
-                borderRadius: theme.spacing(2),
-              },
+              "& .MuiOutlinedInput-root": { borderRadius: theme.spacing(2) },
             }}
           />
 
-          {/* Students Multi-select */}
           <Autocomplete
             multiple
             options={availableStudents}
             getOptionLabel={(student) => student.name}
             value={selectedStudents}
-            onChange={(event, newValue) => setSelectedStudents(newValue)}
+            onChange={(_, newValue) => {
+              setSelectedStudents(newValue);
+              setFormData((prev) => ({
+                ...prev,
+                studentIds: newValue.map((s) => s.id),
+              }));
+            }}
             renderInput={(params) => (
               <TextField
                 {...params}
                 label="Select Students"
                 placeholder="Choose students"
-                variant="outlined"
               />
             )}
             sx={{
-              "& .MuiOutlinedInput-root": {
-                borderRadius: theme.spacing(2),
-              },
+              "& .MuiOutlinedInput-root": { borderRadius: theme.spacing(2) },
             }}
           />
 
-          {/* Submit Button */}
           <Button
             fullWidth
             variant="contained"
@@ -162,22 +194,21 @@ const CreateTeamForm: React.FC = () => {
               fontWeight: 500,
               textTransform: "none",
               boxShadow: "none",
-              "&:hover": {
-                boxShadow: "0 4px 14px rgba(0,0,0,0.1)",
-              },
+              "&:hover": { boxShadow: "0 4px 14px rgba(0,0,0,0.1)" },
             }}
           >
             {isSubmitting ? (
               <Box display="flex" alignItems="center" gap={theme.spacing(1)}>
-                <CircularProgress size={20} color="inherit" />
-                Creating...
+                <CircularProgress size={20} color="inherit" />{" "}
+                {initialTeam ? "Updating..." : "Creating..."}
               </Box>
+            ) : initialTeam ? (
+              "Update Team"
             ) : (
               "Create Team"
             )}
           </Button>
 
-          {/* Message */}
           {message && (
             <Typography
               align="center"
@@ -197,4 +228,4 @@ const CreateTeamForm: React.FC = () => {
   );
 };
 
-export default CreateTeamForm;
+export default TeamsForm;
