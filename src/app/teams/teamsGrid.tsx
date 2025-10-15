@@ -33,12 +33,21 @@ const TeamsGrid: React.FC<TeamsGridProps> = ({
   });
 
   return (
-    <Box>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%", // full height of parent container
+      }}
+    >
+      {/* Grid area */}
       <Box
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
           gap: 4,
+          flexGrow: 1, // fill vertical space
+          minHeight: 0, // important for flex layout
         }}
       >
         {paginatedTeams.map((team) => (
@@ -55,6 +64,7 @@ const TeamsGrid: React.FC<TeamsGridProps> = ({
         ))}
       </Box>
 
+      {/* Pagination pinned at bottom */}
       {totalPages > 1 && (
         <Stack direction="row" spacing={2} justifyContent="center" mt={4}>
           <Button

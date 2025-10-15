@@ -92,16 +92,14 @@ export default function Header(): JSX.Element {
         <Container maxWidth="lg">
           <Toolbar sx={headerStyles.toolbar}>
             {/* Logo */}
-            <Link href="/" legacyBehavior passHref>
-              <Typography
-                variant="h6"
-                component="a"
-                aria-label="Football Manager Home"
-                sx={{ textDecoration: "none", color: "inherit" }}
-              >
-                Football Manager
-              </Typography>
-            </Link>
+            <Typography
+              variant="h6"
+              component={NextLink}
+              href="/"
+              sx={{ color: "inherit", textDecoration: "none", flexGrow: 1 }}
+            >
+              Football Manager
+            </Typography>
 
             {/* Desktop Nav (hidden on small screens via headerStyles) */}
             <Box sx={headerStyles.desktopNav}>
