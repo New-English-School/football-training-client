@@ -12,8 +12,7 @@ interface PaginatedResponse<T> {
 export class BaseService<T> {
   constructor(private readonly endpoint: string) {}
 
-  // Existing findAll
-  async findAll(params?: PaginationDto): Promise<T[]> {
+  async findAll(params?: Record<string, string | number>): Promise<T[]> {
     const res: AxiosResponse<T[] | PaginatedResponse<T>> = await apiClient.get(this.endpoint, { params });
 
     if (Array.isArray(res.data)) return res.data;
