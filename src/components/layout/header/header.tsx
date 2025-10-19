@@ -9,18 +9,14 @@ import {
   Typography,
   IconButton,
   Drawer,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
   Box,
   Button,
   Container,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import { headerStyles } from "./headerStyles";
+import MobileDrawer, { NavItem } from "./mobileDrawer";
 
-type NavItem = { label: string; path: string };
 const navItems: ReadonlyArray<NavItem> = [
   { label: "Calendar", path: "/calendar" },
   { label: "Teams", path: "/teams" },
@@ -36,55 +32,12 @@ export default function Header(): JSX.Element {
   const handleClose = useCallback(() => setMobileOpen(false), []);
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") handleClose();
-    }
+    };
     if (mobileOpen) window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileOpen, handleClose]);
-
-  const drawer = (
-    <Box
-      sx={headerStyles.drawerBox}
-      onClick={handleClose}
-      role="presentation"
-      aria-label="mobile navigation"
-    >
-      <Typography variant="h6" sx={headerStyles.drawerLogo}>
-        <Link href="/" legacyBehavior passHref>
-          <Typography
-            component="a"
-            sx={{ textDecoration: "none", color: "inherit" }}
-          >
-            Football Manager
-          </Typography>
-        </Link>
-      </Typography>
-
-      <List>
-        {navItems.map((item) => (
-          <Link href={item.path} legacyBehavior passHref key={item.label}>
-            {/* ListItem is the structural element (li), ListItemButton renders as <a> */}
-            <ListItem disablePadding component="li">
-              <ListItemButton
-                component="a"
-                onClick={handleClose}
-                sx={{
-                  textAlign: "center",
-                  ...(pathname === item.path ? { fontWeight: 700 } : {}),
-                  textDecoration: "none",
-                  color: "inherit",
-                  width: "100%",
-                }}
-              >
-                <ListItemText primary={item.label} />
-              </ListItemButton>
-            </ListItem>
-          </Link>
-        ))}
-      </List>
-    </Box>
-  );
 
   return (
     <header>
@@ -94,33 +47,33 @@ export default function Header(): JSX.Element {
             {/* Logo */}
             <Typography
               variant="h6"
-              component={NextLink}
+              component={Link}
               href="/"
               sx={{ color: "inherit", textDecoration: "none", flexGrow: 1 }}
             >
               Football Manager
             </Typography>
 
-            {/* Desktop Nav (hidden on small screens via headerStyles) */}
+            {/* Desktop Navigation */}
             <Box sx={headerStyles.desktopNav}>
               {navItems.map((item) => (
-                <Link href={item.path} legacyBehavior passHref key={item.label}>
-                  <Button
-                    component="a"
-                    sx={{
-                      ...headerStyles.navButton,
-                      ...(pathname === item.path ? { fontWeight: 700 } : {}),
-                      textDecoration: "none",
-                      color: "inherit",
-                    }}
-                  >
-                    {item.label}
-                  </Button>
-                </Link>
+                <Button
+                  key={item.label}
+                  component={Link}
+                  href={item.path}
+                  sx={{
+                    ...headerStyles.navButton,
+                    ...(pathname === item.path ? { fontWeight: 700 } : {}),
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
+                >
+                  {item.label}
+                </Button>
               ))}
             </Box>
 
-            {/* Mobile Burger */}
+            {/* Mobile Burger Icon */}
             <IconButton
               color="inherit"
               aria-label="open navigation"
@@ -145,7 +98,7 @@ export default function Header(): JSX.Element {
         sx={{ display: { xs: "block", md: "none" } }}
         id="mobile-menu"
       >
-        {drawer}
+        <MobileDrawer navItems={navItems} onClose={handleClose} />
       </Drawer>
     </header>
   );

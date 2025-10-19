@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
 import Footer from "@/components/layout/footer/footer";
 import Header from "@/components/layout/header/header";
 import { AppProviders } from "./providers";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Football Training System",
   description: "Manage teams, schedules, and players efficiently",
 };

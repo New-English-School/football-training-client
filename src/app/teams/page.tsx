@@ -87,7 +87,7 @@ const TeamsPage: React.FC = () => {
         maxWidth: 1400,
         mx: "auto",
         width: "100%",
-        minHeight: "80vh", // ensures enough height for centering
+        minHeight: "80vh",
         display: "flex",
         flexDirection: "column",
       }}
