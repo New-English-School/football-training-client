@@ -1,5 +1,5 @@
-import TeamsPage from "./teams/page";
+import CalendarPage from "./calendar/page";
 
 export default function Home() {
-  return <TeamsPage />;
+  return <CalendarPage />;
 }

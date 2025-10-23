@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState, Suspense, useCallback } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin, { DateClickArg } from "@fullcalendar/interaction";
-import type { EventClickArg } from "@fullcalendar/core";
 import listPlugin from "@fullcalendar/list";
+import type { EventClickArg } from "@fullcalendar/core";
+
 import {
   Box,
   Typography,
@@ -14,12 +15,19 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+
 import { eventsService } from "@/services/APIs/eventsService";
 import { Event } from "@/types/event";
 import { Team } from "@/types/team";
 import { Coach } from "@/types/coach";
+
 import EventModal from "./EventModal";
 import EventFormModal from "./EventFormModal";
+
+// FullCalendar CSS (imports auto-load their styles)
+import "@fullcalendar/daygrid";
+import "@fullcalendar/timegrid";
+import "@fullcalendar/list";
 
 export interface EventData {
   id: string;
@@ -29,6 +37,7 @@ export interface EventData {
   type: string;
   location: string;
   color: string;
+  backgroundColor?: string;
   teams?: Team[];
   coach?: Coach | null;
 }
@@ -41,6 +50,7 @@ const mapEventToCalendarData = (e: Event): EventData => ({
   start: e.startDate,
   end: e.endDate,
   color: e.type === "match" ? "#ff6b6b" : "#6c63ff",
+  backgroundColor: e.type === "match" ? "#ff6b6b" : "#6c63ff",
   teams: e.teams ?? [],
   coach: e.coach ?? null,
 });
@@ -48,15 +58,17 @@ const mapEventToCalendarData = (e: Event): EventData => ({
 const CalendarPage: React.FC = () => {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeModal, setActiveModal] = useState<"view" | "create" | null>(
+    null
+  );
   const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
-  const [openViewModal, setOpenViewModal] = useState(false);
-  const [openCreateModal, setOpenCreateModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
-  const fetchEvents = async (): Promise<void> => {
+  const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
       const data: Event[] = await eventsService.findAll();
@@ -66,13 +78,13 @@ const CalendarPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [fetchEvents]);
 
-  const handleDateClick = (arg: DateClickArg): void => {
+  const handleDateClick = (arg: DateClickArg) => {
     const clickedDate = new Date(arg.date);
     if (
       arg.view.type === "dayGridMonth" ||
@@ -81,26 +93,28 @@ const CalendarPage: React.FC = () => {
       clickedDate.setHours(9, 0, 0, 0);
     }
     setSelectedDate(clickedDate);
-    setOpenCreateModal(true);
+    setActiveModal("create");
   };
 
-  const handleEventClick = (arg: EventClickArg): void => {
+  const handleEventClick = (arg: EventClickArg) => {
+    const e = arg.event;
     setSelectedEvent({
-      ...(arg.event.extendedProps as EventData),
-      start: arg.event.start ?? new Date(),
-      end: arg.event.end ?? new Date(),
-      title: arg.event.title,
-      id: arg.event.id,
-      color: arg.event.backgroundColor,
+      ...(e.extendedProps as EventData),
+      start: e.start ?? new Date(),
+      end: e.end ?? new Date(),
+      title: e.title,
+      id: e.id,
+      backgroundColor: e.backgroundColor ?? "#6c63ff",
+      color: e.backgroundColor ?? "#6c63ff",
     });
-    setOpenViewModal(true);
+    setActiveModal("view");
   };
 
   const handleEventUpdate = async (
     arg: Parameters<
       NonNullable<React.ComponentProps<typeof FullCalendar>["eventDrop"]>
     >[0]
-  ): Promise<void> => {
+  ) => {
     try {
       await eventsService.update(Number(arg.event.id), {
         startDate: arg.event.start?.toISOString() ?? undefined,
@@ -112,24 +126,44 @@ const CalendarPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (openViewModal) setOpenCreateModal(false);
-  }, [openViewModal]);
+  const closeModal = () => setActiveModal(null);
 
-  useEffect(() => {
-    if (openCreateModal) setOpenViewModal(false);
-  }, [openCreateModal]);
+  // Dynamically adjust header layout for smaller screens
+  const headerToolbar = isMobile
+    ? {
+        left: "title",
+        center: "",
+        right: "prev,next",
+      }
+    : isTablet
+    ? {
+        left: "prev,next today",
+        center: "title",
+        right: "dayGridMonth,timeGridWeek,listWeek",
+      }
+    : {
+        left: "prev,next today",
+        center: "title",
+        right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+      };
 
   return (
     <Box
       sx={{
         px: { xs: 2, md: 8 },
-        py: { xs: 4, md: 8 },
+        py: { xs: 3, md: 6 },
         maxWidth: 1400,
         mx: "auto",
       }}
     >
-      <Typography variant="h4" sx={{ mb: 4, fontWeight: 600 }}>
+      <Typography
+        variant={isMobile ? "h5" : "h4"}
+        sx={{
+          mb: { xs: 3, md: 4 },
+          fontWeight: 600,
+          textAlign: { xs: "center", md: "left" },
+        }}
+      >
         Training & Matches Calendar
       </Typography>
 
@@ -142,48 +176,58 @@ const CalendarPage: React.FC = () => {
           No events found.
         </Typography>
       ) : (
-        <FullCalendar
-          plugins={[
-            dayGridPlugin,
-            timeGridPlugin,
-            interactionPlugin,
-            listPlugin,
-          ]}
-          headerToolbar={{
-            left: "prev,next today",
-            center: "title",
-            right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+        <Box
+          sx={{
+            "& .fc": {
+              fontSize: { xs: "0.8rem", sm: "0.9rem", md: "1rem" },
+            },
+            "& .fc-toolbar-title": {
+              fontSize: { xs: "1rem", sm: "1.2rem", md: "1.4rem" },
+            },
+            "& .fc-button": {
+              padding: { xs: "4px 8px", sm: "6px 12px" },
+              fontSize: { xs: "0.7rem", sm: "0.85rem" },
+              borderRadius: "6px",
+              textTransform: "capitalize",
+            },
           }}
-          initialView={isMobile ? "listWeek" : "dayGridMonth"}
-          editable
-          selectable
-          selectMirror
-          dayMaxEvents
-          events={events}
-          dateClick={handleDateClick}
-          eventClick={handleEventClick}
-          eventDrop={handleEventUpdate}
-          weekends
-          height="auto"
-        />
+        >
+          <FullCalendar
+            plugins={[
+              dayGridPlugin,
+              timeGridPlugin,
+              interactionPlugin,
+              listPlugin,
+            ]}
+            headerToolbar={headerToolbar}
+            initialView={isMobile ? "listWeek" : "dayGridMonth"}
+            editable
+            selectable
+            selectMirror
+            dayMaxEvents
+            events={events}
+            dateClick={handleDateClick}
+            eventClick={handleEventClick}
+            eventDrop={handleEventUpdate}
+            weekends
+            height={isMobile ? "auto" : 800}
+            aspectRatio={isMobile ? 0.75 : 1.35}
+          />
+        </Box>
       )}
 
       <Suspense fallback={null}>
-        {openViewModal && selectedEvent && (
-          <EventModal
-            open={openViewModal}
-            event={selectedEvent}
-            onClose={() => setOpenViewModal(false)}
-          />
+        {activeModal === "view" && selectedEvent && (
+          <EventModal open={true} event={selectedEvent} onClose={closeModal} />
         )}
       </Suspense>
 
       <Suspense fallback={null}>
-        {openCreateModal && (
+        {activeModal === "create" && (
           <EventFormModal
-            open={openCreateModal}
-            onClose={() => setOpenCreateModal(false)}
+            open={true}
             defaultDate={selectedDate ?? undefined}
+            onClose={closeModal}
             onEventCreated={fetchEvents}
           />
         )}
