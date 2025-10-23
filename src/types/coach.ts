@@ -3,7 +3,6 @@ export interface Coach {
   name: string;
   email?: string;
   phoneNumber?: string;
-  specialization?: string;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -10,14 +10,18 @@ import {
   CircularProgress,
   Typography,
   MenuItem,
+  Autocomplete,
 } from "@mui/material";
 import theme from "@/theme/theme";
-import { Team } from "@/types/team";
+
+export interface SelectOption {
+  id: number;
+  name: string;
+}
 
 interface DataFormProps<T> {
   title?: string;
   values: T;
-  teams?: Team[];
   onChange: (
     field: keyof T,
     value: string | number | (string | number)[]
@@ -27,6 +31,8 @@ interface DataFormProps<T> {
     key: keyof T;
     label: string;
     type?: "text" | "email" | "number" | "date" | "select" | "multiselect";
+    options?: SelectOption[];
+    required?: boolean;
   }[];
   submitLabel?: string;
   loading?: boolean;
@@ -36,7 +42,6 @@ interface DataFormProps<T> {
 export default function DataForm<T>({
   title,
   values,
-  teams,
   onChange,
   onSubmit,
   fields,
@@ -78,15 +83,16 @@ export default function DataForm<T>({
             onSubmit();
           }}
         >
-          {fields.map(({ key, label, type }) => {
-            // Handle date formatting (dd/mm/yyyy)
+          {fields.map(({ key, label, type, options, required }) => {
+            const value = values[key];
+
+            // --- Date field ---
             if (type === "date") {
-              const value = values[key] as string | undefined;
               const formatted =
-                value && !value.includes("-")
+                typeof value === "string" && value.includes("-")
                   ? value
                   : value
-                  ? new Date(value).toISOString().split("T")[0]
+                  ? new Date(value as string).toISOString().split("T")[0]
                   : "";
 
               return (
@@ -97,6 +103,7 @@ export default function DataForm<T>({
                   value={formatted}
                   onChange={(e) => onChange(key, e.target.value)}
                   fullWidth
+                  required={required}
                   InputLabelProps={{ shrink: true }}
                   sx={{
                     "& .MuiOutlinedInput-root": {
@@ -107,77 +114,95 @@ export default function DataForm<T>({
               );
             }
 
-            // Handle select (single)
-            if (type === "select" && teams) {
+            // --- Single select ---
+            if (type === "select" && options) {
               return (
                 <TextField
                   key={String(key)}
                   select
                   label={label}
-                  value={(values[key] as string | number | undefined) ?? ""}
+                  value={(value as string | number | undefined) ?? ""}
                   onChange={(e) => onChange(key, +e.target.value)}
                   fullWidth
+                  required={required}
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       borderRadius: theme.spacing(2),
                     },
                   }}
                 >
-                  {teams.map((team) => (
-                    <MenuItem key={team.id} value={team.id}>
-                      {team.name}
+                  {options.map((opt) => (
+                    <MenuItem key={opt.id} value={opt.id}>
+                      {opt.name}
                     </MenuItem>
                   ))}
                 </TextField>
               );
             }
 
-            // Handle multi-select
-            if (type === "multiselect" && teams) {
-              const selected = (values[key] as number[]) ?? [];
+            // --- Multi select (Autocomplete) ---
+            if (type === "multiselect" && options) {
+              const selectedIds = (value as number[]) ?? [];
+              const selectedItems = options.filter((opt) =>
+                selectedIds.includes(opt.id)
+              );
+
               return (
-                <TextField
+                <Autocomplete
                   key={String(key)}
-                  select
-                  SelectProps={{
-                    multiple: true,
-                    value: selected,
-                    onChange: (e) => {
-                      const newValue = e.target.value as number[];
-                      onChange(key, newValue);
-                    },
-                  }}
-                  label={label}
-                  fullWidth
+                  multiple
+                  options={options}
+                  getOptionLabel={(opt) => opt.name}
+                  value={selectedItems}
+                  onChange={(_, newValue) =>
+                    onChange(
+                      key,
+                      newValue.map((opt) => opt.id)
+                    )
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label={label}
+                      placeholder="Select..."
+                      required={required}
+                    />
+                  )}
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       borderRadius: theme.spacing(2),
                     },
                   }}
-                >
-                  {teams.map((team) => (
-                    <MenuItem key={team.id} value={team.id}>
-                      {team.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                />
               );
             }
 
-            // Default field (text, email, number)
+            // --- Default text/number/email field ---
             return (
               <TextField
                 key={String(key)}
                 label={label}
                 type={type || "text"}
-                value={(values[key] as string | number | undefined) ?? ""}
-                onChange={(e) =>
-                  onChange(
-                    key,
-                    type === "number" ? +e.target.value : e.target.value
-                  )
-                }
+                value={(value as string | number | undefined) ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (type === "number") {
+                    // Only allow numeric characters
+                    const regex = /^-?\d*\.?\d*$/;
+                    if (regex.test(val)) {
+                      onChange(key, val === "" ? "" : Number(val));
+                    }
+                  } else {
+                    onChange(key, val);
+                  }
+                }}
                 fullWidth
+                required={required}
+                inputProps={
+                  type === "number"
+                    ? { inputMode: "numeric", pattern: "[0-9]*" }
+                    : undefined
+                }
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     borderRadius: theme.spacing(2),

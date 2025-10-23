@@ -5,7 +5,7 @@ import { Team } from "@/types/team";
 
 export interface TeamCardProps {
   team: Team;
-  onViewEdit?: (team: Team) => void; // open modal
+  onViewEdit?: (team: Team) => void;
   onDelete?: (teamId: number) => void;
 }
 
@@ -15,15 +15,17 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, onViewEdit, onDelete }) => {
       sx={{
         p: 2,
         position: "relative",
-        maxWidth: 300,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        minHeight: 220,
-        maxHeight: 220,
         overflow: "hidden",
+
+        width: { xs: "100%", sm: 250 },
+        minHeight: { xs: 180, sm: 165 },
+        maxHeight: { xs: "auto", sm: 220 },
       }}
     >
+      {/* Delete Button */}
       {onDelete && (
         <IconButton
           sx={{ position: "absolute", top: 8, right: 8 }}
@@ -33,6 +35,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, onViewEdit, onDelete }) => {
         </IconButton>
       )}
 
+      {/* Team Info */}
       <Box sx={{ mb: 1, overflow: "hidden" }}>
         <Typography
           variant="h6"
@@ -55,7 +58,7 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, onViewEdit, onDelete }) => {
             color: "text.secondary",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            whiteSpace: { xs: "normal", sm: "nowrap" },
           }}
         >
           {team.students?.length ?? 0}{" "}
@@ -63,12 +66,18 @@ const TeamCard: React.FC<TeamCardProps> = ({ team, onViewEdit, onDelete }) => {
         </Typography>
       </Box>
 
+      {/* View/Edit Button */}
       {onViewEdit && (
         <Button
           onClick={() => onViewEdit(team)}
           variant="outlined"
           size="small"
-          sx={{ mt: 1, textTransform: "none", borderRadius: 1 }}
+          sx={{
+            mt: 1,
+            textTransform: "none",
+            borderRadius: 1,
+            width: { xs: "100%", sm: "auto" },
+          }}
         >
           View/Edit
         </Button>

@@ -1,197 +1,286 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  Box,
-  useMediaQuery,
-  Modal,
-  CircularProgress,
-  Typography,
-} from "@mui/material";
-import theme from "@/theme/theme";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { Box, useMediaQuery, useTheme } from "@mui/material";
 import { teamsService } from "@/services/APIs/teamsService";
-import { Team } from "@/types/team";
-import TeamsGrid from "./teamsGrid";
-import TeamsForm from "./teamForm";
+import { studentsService } from "@/services/APIs/studentsService";
+import { Team, CreateTeamDto } from "@/types/team";
+import { Student } from "@/types/student";
+import TwoColumnLayout from "@/components/shared/twoColumnLayout";
+import DataForm from "@/components/shared/dataForm";
+import DynamicModal from "@/components/shared/modals/dynamicModal";
+import ConfirmDeleteModal from "@/components/shared/modals/confirmDeleteModal";
+import DataGrid from "@/components/shared/dataGrid";
+import Pagination from "@/components/shared/pagination";
+import TeamCard from "./teamCard";
 
-const TeamsPage: React.FC = () => {
+export default function TeamsPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+
   const [teams, setTeams] = useState<Team[]>([]);
-  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<string>();
+  const [currentPage, setCurrentPage] = useState(0);
 
-  const isDesktop = useMediaQuery("(min-width:1024px)", {
-    noSsr: true,
-    defaultMatches: true,
+  const columns = isMobile ? 1 : 3;
+  const rowsPerPage = isMobile ? 4 : 3;
+  const itemsPerPage = rowsPerPage * columns;
+
+  const [addFormValues, setAddFormValues] = useState<Partial<CreateTeamDto>>({
+    name: "",
+    coachId: undefined,
+    studentIds: [],
   });
 
+  const [modalFormValues, setModalFormValues] = useState<
+    Partial<CreateTeamDto>
+  >({
+    name: "",
+    coachId: undefined,
+    studentIds: [],
+  });
+
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [deleteTeam, setDeleteTeam] = useState<Team | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // --- Fetch data ---
   useEffect(() => {
-    let minLoadingTimeout: NodeJS.Timeout;
-
-    const fetchTeams = async () => {
+    (async () => {
       setLoading(true);
-
-      // Minimum 3 seconds spinner
-      minLoadingTimeout = setTimeout(() => {
-        setLoading(false);
-      }, 3000);
-
       try {
-        const data = await teamsService.findAll();
-        setTeams(data);
-        setLoading(false); // stop spinner if data arrives early
-      } catch (error) {
-        console.error("❌ Failed to fetch teams:", error);
-        setTeams([]);
+        const [teamData, studentData] = await Promise.all([
+          teamsService.findAll(),
+          studentsService.findAll(),
+        ]);
+        setTeams(teamData);
+        setStudents(studentData);
+      } catch (err) {
+        console.error(err);
+        setMessage("❌ Failed to load data.");
+      } finally {
         setLoading(false);
       }
-    };
-
-    fetchTeams();
-
-    return () => clearTimeout(minLoadingTimeout);
+    })();
   }, []);
 
-  const handleAddTeam = (newTeam: Team) =>
-    setTeams((prev) => [...prev, newTeam]);
+  const studentOptions = useMemo(
+    () => students.map((s) => ({ id: s.id, name: s.name })),
+    [students]
+  );
 
-  const handleUpdateTeam = (updatedTeam: Team) =>
-    setTeams((prev) =>
-      prev.map((t) => (t.id === updatedTeam.id ? updatedTeam : t))
-    );
+  type SelectOption = { id: number; name: string };
 
-  const handleDeleteTeam = async (deletedId: number) => {
+  const teamFields: {
+    key: keyof CreateTeamDto;
+    label: string;
+    type?: "text" | "number" | "select" | "multiselect" | "email" | "date";
+    options?: SelectOption[];
+    required?: boolean;
+  }[] = [
+    { key: "name", label: "Team Name", type: "text", required: true },
+    {
+      key: "studentIds",
+      label: "Students",
+      type: "multiselect",
+      options: studentOptions,
+    },
+  ];
+
+  const handleFormChange = useCallback(
+    (setter: React.Dispatch<React.SetStateAction<Partial<CreateTeamDto>>>) =>
+      (
+        key: keyof CreateTeamDto,
+        value: string | number | (string | number)[]
+      ) => {
+        setter((prev) => ({
+          ...prev,
+          [key]:
+            key === "studentIds" && Array.isArray(value)
+              ? value.map(Number)
+              : value,
+        }));
+      },
+    []
+  );
+
+  const handleAddChange = useMemo(
+    () => handleFormChange(setAddFormValues),
+    [handleFormChange]
+  );
+  const handleModalChange = useMemo(
+    () => handleFormChange(setModalFormValues),
+    [handleFormChange]
+  );
+
+  const handleAddSubmit = useCallback(async () => {
     try {
-      await teamsService.remove(deletedId);
-      setTeams((prev) => prev.filter((t) => t.id !== deletedId));
-    } catch (error) {
-      console.error("❌ Failed to delete team:", error);
+      const payload: CreateTeamDto = {
+        name: addFormValues.name?.toString() ?? "",
+        coachId: addFormValues.coachId,
+        studentIds: (addFormValues.studentIds as number[]) ?? [],
+      };
+      const saved = await teamsService.create(payload);
+      setTeams((prev) => [...prev, saved]);
+      setAddFormValues({ name: "", coachId: undefined, studentIds: [] });
+      setMessage(`✅ Team "${saved.name}" created.`);
+    } catch (err) {
+      console.error(err);
+      setMessage("❌ Failed to create team.");
     }
-  };
+  }, [addFormValues]);
 
-  const handleViewEdit = (team: Team) => {
+  const handleEdit = useCallback((team: Team) => {
+    const studentIds =
+      (team.students as (number | { id: number })[] | undefined)?.map((s) =>
+        typeof s === "number" ? s : s.id
+      ) ?? [];
     setEditingTeam(team);
+    setModalFormValues({ name: team.name, coachId: team.coachId, studentIds });
     setModalOpen(true);
-  };
+  }, []);
 
-  const handleCloseModal = () => {
-    setEditingTeam(null);
-    setModalOpen(false);
-  };
+  const handleModalSubmit = useCallback(async () => {
+    if (!editingTeam) return;
+    try {
+      const payload: CreateTeamDto = {
+        name: modalFormValues.name?.toString() ?? "",
+        coachId: modalFormValues.coachId,
+        studentIds: (modalFormValues.studentIds as number[]) ?? [],
+      };
+      const updated = await teamsService.update(editingTeam.id, payload);
+      setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setMessage(`✅ Team "${updated.name}" updated.`);
+      setModalOpen(false);
+      setEditingTeam(null);
+      setModalFormValues({ name: "", coachId: undefined, studentIds: [] });
+    } catch (err) {
+      console.error(err);
+      setMessage("❌ Failed to update team.");
+    }
+  }, [editingTeam, modalFormValues]);
+
+  const handleDelete = useCallback(
+    (id: number) => {
+      const t = teams.find((x) => x.id === id) ?? null;
+      setDeleteTeam(t);
+      setConfirmOpen(true);
+    },
+    [teams]
+  );
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTeam) return;
+    try {
+      await teamsService.remove(deleteTeam.id);
+      setTeams((prev) => prev.filter((t) => t.id !== deleteTeam.id));
+      setMessage(`✅ Team "${deleteTeam.name}" deleted.`);
+    } catch (err) {
+      console.error(err);
+      setMessage("❌ Failed to delete team.");
+    } finally {
+      setDeleteTeam(null);
+      setConfirmOpen(false);
+    }
+  }, [deleteTeam]);
+
+  // --- Pagination ---
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(teams.length / itemsPerPage)),
+    [teams.length, itemsPerPage]
+  );
+
+  useEffect(() => {
+    if (currentPage >= totalPages) {
+      setCurrentPage(totalPages - 1);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedTeams = useMemo(
+    () =>
+      teams.slice(currentPage * itemsPerPage, (currentPage + 1) * itemsPerPage),
+    [teams, currentPage, itemsPerPage]
+  );
 
   return (
-    <Box
-      sx={{
-        px: { xs: 2, sm: 4, md: 8 },
-        py: { xs: 4, md: 8 },
-        maxWidth: 1400,
-        mx: "auto",
-        width: "100%",
-        minHeight: "80vh",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: isDesktop ? "row" : "column",
-          alignItems: "stretch",
-          gap: theme.spacing(6),
-          flexGrow: 1, // fills vertical space
+    <Box sx={{ px: { xs: 2, md: 4 }, py: { xs: 3, md: 6 } }}>
+      <TwoColumnLayout
+        form={
+          <DataForm<Partial<CreateTeamDto>>
+            title="Create Team"
+            values={addFormValues}
+            onChange={handleAddChange}
+            onSubmit={handleAddSubmit}
+            fields={teamFields}
+            submitLabel="Create Team"
+            loading={loading}
+            message={message}
+          />
+        }
+        content={
+          <Box sx={{ display: "flex", flexDirection: "column" }}>
+            <DataGrid
+              data={paginatedTeams}
+              keyExtractor={(team) => team.id}
+              renderItem={(team) => (
+                <TeamCard
+                  team={team}
+                  onViewEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              )}
+              columns={columns}
+              rowsPerPage={rowsPerPage}
+              gap={isMobile ? 2 : 4}
+            />
+            <Box sx={{ mt: { xs: 2, md: 4 } }}>
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            </Box>
+          </Box>
+        }
+        loading={loading}
+        empty={teams.length === 0}
+        emptyMessage="No teams found."
+        fixedHeight="auto"
+        fixedWidth="100%"
+      />
+
+      {/* Edit Modal */}
+      <DynamicModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingTeam(null);
+          setModalFormValues({ name: "", coachId: undefined, studentIds: [] });
         }}
+        title="Edit Team"
+        maxWidth="600px"
       >
-        {/* Left column: create/edit team form */}
-        <Box
-          sx={{
-            flex: 1,
-            minWidth: { xs: "100%", md: 400 },
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <TeamsForm onSuccess={handleAddTeam} />
-        </Box>
+        <DataForm<Partial<CreateTeamDto>>
+          values={modalFormValues}
+          onChange={handleModalChange}
+          onSubmit={handleModalSubmit}
+          fields={teamFields}
+          submitLabel="Update Team"
+          loading={loading}
+          message={message}
+        />
+      </DynamicModal>
 
-        {/* Right column: TeamsGrid or loading/empty state */}
-        <Box
-          sx={{
-            flex: 2,
-            mt: isDesktop ? 0 : 4,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "stretch",
-          }}
-        >
-          {loading ? (
-            <Box
-              sx={{
-                flexGrow: 1,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                width: "100%",
-              }}
-            >
-              <CircularProgress size={60} />
-            </Box>
-          ) : teams.length === 0 ? (
-            <Box
-              sx={{
-                flexGrow: 1,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                width: "100%",
-              }}
-            >
-              <Typography
-                variant="h6"
-                color="text.secondary"
-                textAlign="center"
-              >
-                No teams found.
-              </Typography>
-            </Box>
-          ) : (
-            <TeamsGrid
-              teams={teams}
-              onViewEdit={handleViewEdit}
-              onDelete={handleDeleteTeam}
-            />
-          )}
-        </Box>
-      </Box>
-
-      {/* Modal for editing team */}
-      <Modal open={modalOpen} onClose={handleCloseModal}>
-        <Box
-          sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: { xs: "90%", md: 500 },
-            bgcolor: "background.paper",
-            p: 4,
-            borderRadius: 2,
-            boxShadow: 24,
-          }}
-        >
-          {editingTeam && (
-            <TeamsForm
-              initialTeam={editingTeam}
-              onSuccess={(updatedTeam) => {
-                handleUpdateTeam(updatedTeam);
-                handleCloseModal();
-              }}
-            />
-          )}
-        </Box>
-      </Modal>
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={confirmDelete}
+        entityName="team"
+      />
     </Box>
   );
-};
-
-export default TeamsPage;
+}

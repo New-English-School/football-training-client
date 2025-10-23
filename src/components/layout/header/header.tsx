@@ -12,9 +12,9 @@ import {
   Box,
   Button,
   Container,
+  useTheme,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import { headerStyles } from "./headerStyles";
 import MobileDrawer, { NavItem } from "./mobileDrawer";
 
 const navItems: ReadonlyArray<NavItem> = [
@@ -27,6 +27,7 @@ const navItems: ReadonlyArray<NavItem> = [
 export default function Header(): JSX.Element {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const theme = useTheme();
 
   const handleDrawerToggle = useCallback(() => setMobileOpen((s) => !s), []);
   const handleClose = useCallback(() => setMobileOpen(false), []);
@@ -41,47 +42,80 @@ export default function Header(): JSX.Element {
 
   return (
     <header>
-      <AppBar position="static" color="primary" sx={{ boxShadow: "none" }}>
+      <AppBar
+        position="static"
+        elevation={0}
+        sx={{
+          backgroundColor: theme.palette.background.paper,
+          color: theme.palette.text.primary,
+          borderBottom: `1px solid ${theme.palette.divider}`,
+        }}
+      >
         <Container maxWidth="lg">
-          <Toolbar sx={headerStyles.toolbar}>
-            {/* Logo */}
+          <Toolbar
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              minHeight: 72,
+            }}
+          >
+            {/* Logo / Title */}
             <Typography
               variant="h6"
               component={Link}
               href="/"
-              sx={{ color: "inherit", textDecoration: "none", flexGrow: 1 }}
+              sx={{
+                textDecoration: "none",
+                color: theme.palette.primary.main,
+                fontWeight: 700,
+                letterSpacing: 0.5,
+              }}
             >
               Football Manager
             </Typography>
 
             {/* Desktop Navigation */}
-            <Box sx={headerStyles.desktopNav}>
-              {navItems.map((item) => (
-                <Button
-                  key={item.label}
-                  component={Link}
-                  href={item.path}
-                  sx={{
-                    ...headerStyles.navButton,
-                    ...(pathname === item.path ? { fontWeight: 700 } : {}),
-                    textDecoration: "none",
-                    color: "inherit",
-                  }}
-                >
-                  {item.label}
-                </Button>
-              ))}
+            <Box sx={{ display: { xs: "none", md: "flex" }, gap: 2 }}>
+              {navItems.map((item) => {
+                const isActive = pathname === item.path;
+                return (
+                  <Button
+                    key={item.label}
+                    component={Link}
+                    href={item.path}
+                    sx={{
+                      color: isActive
+                        ? theme.palette.primary.main
+                        : theme.palette.text.secondary,
+                      fontWeight: isActive ? 600 : 400,
+                      fontSize: 15,
+                      borderRadius: 2,
+                      textTransform: "none",
+                      "&:hover": {
+                        backgroundColor: theme.palette.action.hover,
+                        color: theme.palette.primary.main,
+                      },
+                    }}
+                  >
+                    {item.label}
+                  </Button>
+                );
+              })}
             </Box>
 
-            {/* Mobile Burger Icon */}
+            {/* Mobile Menu Button */}
             <IconButton
+              edge="end"
               color="inherit"
               aria-label="open navigation"
               aria-controls="mobile-menu"
               aria-expanded={mobileOpen}
-              edge="end"
               onClick={handleDrawerToggle}
-              sx={{ display: { md: "none" } }}
+              sx={{
+                display: { md: "none" },
+                color: theme.palette.primary.main,
+              }}
             >
               <MenuIcon />
             </IconButton>
